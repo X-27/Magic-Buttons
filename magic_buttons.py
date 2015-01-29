@@ -2,6 +2,7 @@ bl_info = {
 	"name": "Magic Buttons",
 	"description": "A few useful tools for the level 1 noob, and the legendary magic render button that will make all renders perferct.",
 	"author": "X-27, David Bates",
+	"version": (99999,99),
 	"blender": (2, 3, 7),
 	"location": "Properties  > Scene",
 	"category": "Render",
@@ -90,6 +91,30 @@ def create_material():
 		
 		# Emission > Material Output
 		mat.node_tree.links.new(emission.outputs['Emission'], nodes['Material Output'].inputs['Surface'])
+		
+	# BI material
+	if scn.render.engine == 'BLENDER_RENDER':
+		# material settings
+		mat.diffuse_color = (0.0175381, 0.148583, 0.636863)
+		mat.emit = 1
+		
+		# Create procedural texture 
+		magTex = bpy.data.textures.new('Magic', type = 'MAGIC')
+		magTex.noise_depth = 0  
+		magTex.turbulence = 5
+		
+		# Add texture slot to material
+		mts = mat.texture_slots.add()
+		mts.texture = magTex
+		# texture settings
+		mts.texture_coords = 'GLOBAL'
+		mts.scale[0] = 5
+		mts.scale[1] = 5
+		mts.scale[2] = 5
+		mts.use_map_color_diffuse = True
+		mts.use_map_emit = True
+		#mts.emit_factor = 0.75
+		mts.blend_type = 'MULTIPLY'
 
 #
 # --- Draw UI in properties window ---
@@ -166,7 +191,7 @@ if __name__ == "__main__":
 	register()
 
 
-#    awesome picture ↓↓↓↓↓↓↓
+#    awesome picture ↓↓↓↓↓↓↓↓
 
 
 #               ___________
