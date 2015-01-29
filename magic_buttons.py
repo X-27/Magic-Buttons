@@ -1,180 +1,172 @@
 bl_info = {
-    "name": "Magic Buttons",
-    "description": "A few usefull tools for the level 1 noob, and the legendary magic render button that will make all renders perferct.",
-    "author": "X-27",
-    "blender": (2, 7, 3),
-    "location": "Properties  > Scene",
-    "category": "Render",
+	"name": "Magic Buttons",
+	"description": "A few useful tools for the level 1 noob, and the legendary magic render button that will make all renders perferct.",
+	"author": "X-27, David Bates",
+	"blender": (2, 3, 7),
+	"location": "Properties  > Scene",
+	"category": "Render",
 }
 
 import bpy
 
-
+#
+# --- operator for the "magic button" ---
+#
 class RLoverride(bpy.types.Operator):
-    """Set render layer material override"""
-    bl_idname = "magic.render_button"
-    bl_label = "Magic Material"
-    bl_options = {'REGISTER', 'UNDO'}
+	'''Set render layer material override'''
+	bl_idname = "magic.render_button"
+	bl_label = "Magic Material"
+	bl_options = {'REGISTER', 'UNDO'}
 
-    def execute(self, context):
-        create_material(None)
-        bpy.context.scene.render.layers["RenderLayer"].material_override = bpy.data.materials["magic"]
-        bpy.ops.render.view_show('INVOKE_SCREEN')
-        bpy.ops.render.render()
-        return {'FINISHED'}
-
-
-#      O====||========================>
-
-def create_material(settings):
-    scn = bpy.context.scene
-    mat = bpy.data.materials.new('magic')
-    if scn.render.engine == 'CYCLES':
-        mat.use_nodes = True
-        nodes = mat.node_tree.nodes
-        
-        nodes.remove(nodes['Diffuse BSDF'])
-        
-        emission = nodes.new('ShaderNodeEmission')
-        #emission.name = 'Emission'
-        
-        colorMix = nodes.new('ShaderNodeMixRGB')
-        colorMix.blend_type = 'MULTIPLY'
-        colorMix.inputs[0].default_value = 1
-        colorMix.inputs[2].default_value = (0.0175381, 0.148583, 0.636863, 1)
-        
-        magicTex = nodes.new('ShaderNodeTexMagic')
-        magicTex.turbulence_depth = 0
-        #magicTex.name = 'Magic Texture'
-        
-        multiply = nodes.new('ShaderNodeMath')
-        multiply.operation = 'MULTIPLY'
-        multiply.inputs[1].default_value = 5
-        multiply.name = 'Multiply'
-        
-        
-        max = nodes.new('ShaderNodeMath')
-        max.operation = 'MAXIMUM'
-        max.inputs[0].default_value = 0.1
-        max.name = 'Maximum'
-        
-        objInfo = nodes.new('ShaderNodeObjectInfo')
-        #objInfo.name = 'Object Info'
-        
-        
-        
-        # node links
-        
-        # Object Info > Maximum
-        mat.node_tree.links.new(objInfo.outputs['Random'], max.inputs[1])
-        
-        # Maximum > Multiply
-        mat.node_tree.links.new(max.outputs['Value'], multiply.inputs[0])
-        
-        # Multiply > Magic Texture
-        mat.node_tree.links.new(multiply.outputs['Value'], magicTex.inputs['Scale'])
-         
-        # Magic Texture > Mix
-        mat.node_tree.links.new(magicTex.outputs['Color'], colorMix.inputs[1])
-        
-        # Mix > Emission
-        mat.node_tree.links.new(colorMix.outputs['Color'], emission.inputs['Color'])
-        
-        # Emission > Material Output
-        mat.node_tree.links.new(emission.outputs['Emission'], nodes['Material Output'].inputs['Surface'])
-        pass
+	def execute(self, context):
+		create_material()
+		bpy.context.scene.render.layers["RenderLayer"].material_override = bpy.data.materials["magic"]
+		bpy.ops.render.view_show('INVOKE_SCREEN')
+		bpy.ops.render.render()
+		return {'FINISHED'}
 
 
+#
+# --- new material, BI or cycles ---
+#
+def create_material():
+	scn = bpy.context.scene
+	mat = bpy.data.materials.new('magic')
+	
+	# cycles material
+	if scn.render.engine == 'CYCLES':
+		# - nodes -
+		mat.use_nodes = True
+		nodes = mat.node_tree.nodes
+		
+		#diffuse
+		nodes.remove(nodes['Diffuse BSDF'])
+		
+		#emission
+		emission = nodes.new('ShaderNodeEmission')
+		#emission.name = 'Emission'
+		
+		#Mix node
+		colorMix = nodes.new('ShaderNodeMixRGB')
+		colorMix.blend_type = 'MULTIPLY'
+		colorMix.inputs[0].default_value = 1
+		colorMix.inputs[2].default_value = (0.0175381, 0.148583, 0.636863, 1)
+		
+		#magic texture
+		magicTex = nodes.new('ShaderNodeTexMagic')
+		magicTex.turbulence_depth = 0
+		
+		#math
+		multiply = nodes.new('ShaderNodeMath')
+		multiply.operation = 'MULTIPLY'
+		multiply.inputs[1].default_value = 5
+		multiply.name = 'Multiply'
+		
+		#math
+		max = nodes.new('ShaderNodeMath')
+		max.operation = 'MAXIMUM'
+		max.inputs[0].default_value = 0.1
+		max.name = 'Maximum'
+		
+		# Object Info
+		objInfo = nodes.new('ShaderNodeObjectInfo')
+		
+	# - node links -
+		
+		# Object Info > Maximum
+		mat.node_tree.links.new(objInfo.outputs['Random'], max.inputs[1])
+		
+		# Maximum > Multiply
+		mat.node_tree.links.new(max.outputs['Value'], multiply.inputs[0])
+		
+		# Multiply > Magic Texture
+		mat.node_tree.links.new(multiply.outputs['Value'], magicTex.inputs['Scale'])
+		 
+		# Magic Texture > Mix
+		mat.node_tree.links.new(magicTex.outputs['Color'], colorMix.inputs[1])
+		
+		# Mix > Emission
+		mat.node_tree.links.new(colorMix.outputs['Color'], emission.inputs['Color'])
+		
+		# Emission > Material Output
+		mat.node_tree.links.new(emission.outputs['Emission'], nodes['Material Output'].inputs['Surface'])
 
-
-
-
-
-
+#
+# --- Draw UI in properties window ---
+#
 class MagicPanel(bpy.types.Panel):
-    """Creates a Panel in the Object properties window"""
-    bl_label = "Magic Buttons"
-    bl_idname = "Magic Render"
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "render"
+	'''Creates a Panel in the Render properties window'''
+	bl_label = 'Magic Buttons'
+	bl_idname = 'Magic Render'
+	bl_space_type = 'PROPERTIES'
+	bl_region_type = 'WINDOW'
+	bl_context = 'render'
 
-    def draw(self, context):
-        layout = self.layout
+	def draw(self, context):
+		layout = self.layout
 
-# Trash - ignore if it doesn't work
+		# Totally awesome magic render button
+		r0 = layout.row()
+		r0.label(text="Invoke the power of the Magic Render Button")
 
-# Totally awesome magic render button
-        row = layout.row()
-        row.label(text="Invoke the power of the Magic Render Button")
+		r1 = layout.row()
+		r1.operator("magic.render_button", text="Magic Render", icon='OUTLINER_OB_CAMERA')
 
-        row = layout.row()
-        
-        row.operator("magic.render_button", text="Magic Render", icon='OUTLINER_OB_CAMERA')
- 
+		# buttons for noob   - Whoops and nevermind
+		r2 = layout.row()
+		r2.label(text="Other helpfull Noob tools")
 
-# buttons for noob   - WHoops and nevermind
-        row = layout.row()
-        row.label(text="Other helpfull Noob tools")
+		r3 = layout.row()
+		r3.operator("ed.undo", text="Whoops!", icon='LOOP_BACK')
+		r3.operator("ed.redo", text="Nevermind", icon='LOOP_FORWARDS')
 
-        row = layout.row()
-        row.operator("ed.undo", text="Whoops!", icon='LOOP_BACK')
+		# Bring forth the smooth monkey
+		r4 = layout.row()
+		r4.label(text="Basic Noob Tools")
 
-        row.operator("ed.redo", text="Nevermind", icon='LOOP_FORWARDS')
+		r5 = layout.row()
+		r5.operator("mesh.primitive_monkey_add", text="bring forth a monkey", icon='MONKEY')
+		r5.operator("object.shade_smooth", text="Make Smooth", icon='OUTLINER_OB_SURFACE')
+		
+		r6 = layout.row()
+		r6.operator("object.subdivision_set", text="Invoke the Magic of sub-serf", icon='MOD_SUBSURF')
 
-# Bring forth the smooth monkey
-        row = layout.row()
-        row.label(text="Basic Noob Tools")
+		# Randomly delete stuff
+		r7 = layout.row()
+		r7.label(text="If you only have a few mistakes")
 
-        row = layout.row()
-        
-        row.operator("mesh.primitive_monkey_add", text="bring forth a monkey", icon='MONKEY')
-        row.operator("object.shade_smooth", text="Make Smooth", icon='OUTLINER_OB_SURFACE')
-        row = layout.row()
-        
-        row.operator("object.subdivision_set", text="Invoke the Magic of sub-serf", icon='MOD_SUBSURF')
+		r8 = layout.row()
+		r8.operator("object.select_random", text="random selection", icon='QUESTION')
+		r8.operator("object.delete", text="remove selected", icon='MOD_EXPLODE')
 
-# Randomly delete stuff
-        row = layout.row()
-        row.label(text="If you only have a few mistakes")
+		# Nuke the Blend!!!
+		r9 = layout.row()
+		r9.label(text="If you really messed up something")
 
-        row = layout.row()
-        
-        row.operator("object.select_random", text="random selection", icon='QUESTION')
-
-        row.operator("object.delete", text="remove selected", icon='MOD_EXPLODE')
-
-
-
-# Nuke the Blend!!!
-        row = layout.row()
-        row.label(text="If you really messed up something")
-
-        row = layout.row()
-        
-        row.operator("wm.read_homefile", text="Permanently Annihilate my Disaster", icon='RADIO')
+		r10 = layout.row()
+		r10.operator("wm.read_homefile", text="Permanently Annihilate my Disaster", icon='RADIO')
+# end MagicPanel
 
 
 
-
-
-
-
+#
+# --- reg and unreg it all ---
+#
 def register():
-    bpy.utils.register_class(MagicPanel)
-    bpy.utils.register_class(RLoverride)
+	bpy.utils.register_class(MagicPanel)
+	bpy.utils.register_class(RLoverride)
 
 
 def unregister():
-    bpy.utils.unregister_class(MagicPanel)
-    bpy.utils.unregister_class(RLoverride)
+	bpy.utils.unregister_class(MagicPanel)
+	bpy.utils.unregister_class(RLoverride)
 
 
 if __name__ == "__main__":
-    register()
+	register()
 
 
-#    awesome picture ↓↓↓↓↓↓↓↓
+#    awesome picture ↓↓↓↓↓↓↓
 
 
 #               ___________
